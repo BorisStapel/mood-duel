@@ -1,3 +1,4 @@
+cat > .github/workflows/deploy.yml << 'EOF'
 name: Deploy to Cloud Run
 
 on:
@@ -6,7 +7,7 @@ on:
 
 env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-  REGION: europe-west1           # Change to your preferred region
+  REGION: europe-west1
   SERVICE_NAME: mood-duel
   IMAGE: gcr.io/${{ secrets.GCP_PROJECT_ID }}/mood-duel
 
@@ -53,3 +54,4 @@ jobs:
             --memory 256Mi \
             --min-instances 0 \
             --max-instances 5
+EOF
