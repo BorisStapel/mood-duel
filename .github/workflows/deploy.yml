@@ -37,7 +37,10 @@ jobs:
           SA_EMAIL="${SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
           
           # Create service account if it doesn't exist
-          gcloud iam service-accounts create $SA_NAME --display-name="Mood Duel Service" 2>/dev/null || true
+          if ! gcloud iam service-accounts describe $SA_EMAIL &>/dev/null; then
+            gcloud iam service-accounts create $SA_NAME --display-name="Mood Duel Service"
+            sleep 5  # Wait for account to be fully created
+          fi
           
           # Grant minimal permissions (logging only)
           gcloud projects add-iam-policy-binding $PROJECT_ID \
