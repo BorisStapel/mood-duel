@@ -52,23 +52,42 @@ docker run -p 8080:8080 mood-duel
 
 2. **Enable APIs**:
    ```bash
-   gcloud services enable run.googleapis.com containerregistry.googleapis.com
+   gcloud services enable run.googleapis.com containerregistry.googleapis.com iam.googleapis.com
    ```
 
-3. **Create a Service Account** with these roles:
-   - Cloud Run Admin
-   - Storage Admin
-   - Service Account User
+3. **Create a CI/CD Service Account** with deployment permissions:
+   ```bash
+   gcloud iam service-accounts create mood-duel-ci --display-name="Mood Duel CI/CD"
+   
+   # Grant permissions for Cloud Run deployments
+   gcloud projects add-iam-policy-binding PROJECT_ID \
+     --member="serviceAccount:mood-duel-ci@PROJECT_ID.iam.gserviceaccount.com" \
+     --role="roles/run.admin"
+   
+   gcloud projects add-iam-policy-binding PROJECT_ID \
+     --member="serviceAccount:mood-duel-ci@PROJECT_ID.iam.gserviceaccount.com" \
+     --role="roles/storage.admin"
+   
+   gcloud projects add-iam-policy-binding PROJECT_ID \
+     --member="serviceAccount:mood-duel-ci@PROJECT_ID.iam.gserviceaccount.com" \
+     --role="roles/iam.serviceAccountUser"
+   ```
 
-4. **Download the SA key** as JSON
+4. **Download the CI/CD SA key** as JSON:
+   ```bash
+   gcloud iam service-accounts keys create ci-key.json \
+     --iam-account=mood-duel-ci@PROJECT_ID.iam.gserviceaccount.com
+   ```
 
 5. **Add GitHub Secrets** in your repo → Settings → Secrets:
    | Secret | Value |
    |---|---|
    | `GCP_PROJECT_ID` | Your GCP project ID |
-   | `GCP_SA_KEY` | The full JSON content of your service account key |
+   | `GCP_SA_KEY` | The full JSON content of ci-key.json |
 
 6. **Push to `main`** — GitHub Actions will build and deploy automatically!
+   - The CI/CD creates a dedicated `mood-duel-service` account with minimal permissions (logging only)
+   - Cloud Run instances use this least-privilege service account
 
 ### Manual deploy (without CI/CD)
 

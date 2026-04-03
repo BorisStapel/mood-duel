@@ -32,6 +32,22 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
+      - name: Create service account and grant permissions
+        run: |
+          SA_NAME="mood-duel-service"
+          SA_EMAIL="${SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
+          
+          # Create service account if it doesn't exist
+          gcloud iam service-accounts create $SA_NAME --display-name="Mood Duel Service" 2>/dev/null || true
+          
+          # Grant minimal permissions (logging only)
+          gcloud projects add-iam-policy-binding $PROJECT_ID \
+            --member="serviceAccount:${SA_EMAIL}" \
+            --role="roles/logging.logWriter" \
+            --quiet
+          
+          echo "SA_EMAIL=${SA_EMAIL}" >> $GITHUB_ENV
+
       - name: Configure Docker for GCR
         run: gcloud auth configure-docker --quiet
 
@@ -53,5 +69,6 @@ jobs:
             --port 8080 \
             --memory 256Mi \
             --min-instances 0 \
-            --max-instances 1
+            --max-instances 1 \
+            --service-account $SA_EMAIL
 EOF
