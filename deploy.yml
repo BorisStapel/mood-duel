@@ -9,7 +9,7 @@ env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
   REGION: europe-west1
   SERVICE_NAME: mood-duel
-  IMAGE: gcr.io/${{ secrets.GCP_PROJECT_ID }}/mood-duel
+  IMAGE: europe-west1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/mood-duel/mood-duel
 
 jobs:
   deploy:
@@ -48,8 +48,8 @@ jobs:
           
           echo "SA_EMAIL=${SA_EMAIL}" >> $GITHUB_ENV
 
-      - name: Configure Docker for GCR
-        run: gcloud auth configure-docker --quiet
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker europe-west1-docker.pkg.dev --quiet
 
       - name: Build Docker image
         run: docker build -t $IMAGE:$GITHUB_SHA -t $IMAGE:latest .
