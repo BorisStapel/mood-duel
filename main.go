@@ -7,13 +7,15 @@ import (
 	"net/http"
 	"os"
 	"sync"
-	"time"
 
 	"github.com/gorilla/websocket"
 )
 
 var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool { return true },
+	CheckOrigin: func(r *http.Request) bool {
+		// Restrict this to your actual production domain in a real deployment
+		return true
+	},
 }
 
 type Client struct {
@@ -24,11 +26,11 @@ type Client struct {
 }
 
 type Room struct {
-	players  []*Client
-	moves    map[string]string
-	scores   map[string]int
-	mu       sync.Mutex
-	round    int
+	players []*Client
+	moves   map[string]string
+	scores  map[string]int
+	mu      sync.Mutex
+	round   int
 }
 
 type Hub struct {
@@ -39,8 +41,8 @@ type Hub struct {
 var hub = &Hub{rooms: make(map[string]*Room)}
 
 type Message struct {
-	Type     string            `json:"type"`
-	Payload  map[string]string `json:"payload,omitempty"`
+	Type    string            `json:"type"`
+	Payload map[string]string `json:"payload,omitempty"`
 }
 
 func (h *Hub) getOrCreateRoom(id string) *Room {
@@ -58,9 +60,14 @@ func (h *Hub) getOrCreateRoom(id string) *Room {
 	return r
 }
 
-func broadcast(room *Room, msg interface{}) {
-	data, _ := json.Marshal(msg)
-	for _, p := range room.players {
+func (r *Room) broadcast(msg interface{}) {
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, p := range r.players {
 		select {
 		case p.send <- data:
 		default:
@@ -103,6 +110,10 @@ func init() {
 }
 
 func resolveRound(a, b string) (winner string, flavor string) {
+	if _, ok := emojiRules[a]; !ok {
+		return "", "An unknown force interferes... 🌀"
+	}
+
 	if a == b {
 		return "", "It's a tie! Great minds think alike 🤝"
 	}
@@ -158,10 +169,13 @@ func handleWS(w http.ResponseWriter, r *http.Request) {
 	go writePump(client)
 
 	// Send welcome
-	welcome, _ := json.Marshal(map[string]interface{}{
+	welcome, err := json.Marshal(map[string]interface{}{
 		"type":    "welcome",
 		"payload": map[string]string{"playerID": playerID, "roomID": roomID},
 	})
+	if err != nil {
+		return
+	}
 	client.send <- welcome
 
 	if playerCount == 2 {
@@ -169,13 +183,15 @@ func handleWS(w http.ResponseWriter, r *http.Request) {
 			"type":    "start",
 			"payload": map[string]string{"msg": "Both players connected! Round 1 — choose your emoji! ⚔️"},
 		})
-		broadcast(room, json.RawMessage(start))
+		room.broadcast(json.RawMessage(start))
 	} else {
-		waiting, _ := json.Marshal(map[string]interface{}{
+		waiting, err := json.Marshal(map[string]interface{}{
 			"type":    "waiting",
 			"payload": map[string]string{"msg": "Waiting for opponent to join..."},
 		})
-		client.send <- waiting
+		if err == nil {
+			client.send <- waiting
+		}
 	}
 
 	defer func() {
@@ -186,6 +202,13 @@ func handleWS(w http.ResponseWriter, r *http.Request) {
 				room.players = append(room.players[:i], room.players[i+1:]...)
 				break
 			}
+		}
+
+		// Cleanup room if empty to prevent memory leak
+		if len(room.players) == 0 {
+			hub.mu.Lock()
+			delete(hub.rooms, roomID)
+			hub.mu.Unlock()
 		}
 		room.mu.Unlock()
 	}()
@@ -201,6 +224,12 @@ func handleWS(w http.ResponseWriter, r *http.Request) {
 		}
 		if m.Type == "move" {
 			emoji := m.Payload["emoji"]
+
+			// Validate emoji
+			if _, ok := emojiRules[emoji]; !ok && emoji != "🎲" && emoji != "🌈" {
+				continue
+			}
+
 			room.mu.Lock()
 			room.moves[playerID] = emoji
 			bothMoved := len(room.moves) == 2
@@ -219,33 +248,34 @@ func handleWS(w http.ResponseWriter, r *http.Request) {
 				result := map[string]interface{}{
 					"type": "result",
 					"payload": map[string]interface{}{
-						"moveA":   moveA,
-						"moveB":   moveB,
-						"winner":  winner,
-						"flavor":  flavor,
-						"scoreA":  room.scores["A"],
-						"scoreB":  room.scores["B"],
-						"round":   room.round,
+						"moveA":  moveA,
+						"moveB":  moveB,
+						"winner": winner,
+						"flavor": flavor,
+						"scoreA": room.scores["A"],
+						"scoreB": room.scores["B"],
+						"round":  room.round,
 					},
 				}
 				room.moves = make(map[string]string)
 				room.round++
 				room.mu.Unlock()
-				broadcast(room, result)
+				room.broadcast(result)
 			} else {
 				// Notify both that one player has chosen
-				waiting, _ := json.Marshal(map[string]interface{}{
+				waiting, err := json.Marshal(map[string]interface{}{
 					"type":    "waiting_move",
 					"payload": map[string]string{"msg": "Waiting for opponent's move..."},
 				})
-				broadcast(room, json.RawMessage(waiting))
+				if err == nil {
+					room.broadcast(json.RawMessage(waiting))
+				}
 			}
 		}
 	}
 }
 
 func main() {
-	rand.Seed(time.Now().UnixNano())
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
