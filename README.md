@@ -50,67 +50,75 @@ docker run -p 8080:8080 mood-duel
 
 1. **Create a GCP project** at [console.cloud.google.com](https://console.cloud.google.com)
 
-2. **Enable required APIs**:
+2. **Set your Project ID variable**:
+   ```bash
+   export PROJECT_ID="mood-duel-app"
+   gcloud config set project $PROJECT_ID
+   ```
+
+3. **Enable required APIs**:
    ```bash
    gcloud services enable run.googleapis.com artifact-registry.googleapis.com iam.googleapis.com cloudresourcemanager.googleapis.com
    ```
 
-3. **Create a runtime service account** (runs Cloud Run with minimal permissions):
+4. **Create the runtime service account** (runs the app):
    ```bash
    gcloud iam service-accounts create mood-duel-service --display-name="Mood Duel Service"
    
    # Grant minimal permissions (logging only)
-   gcloud projects add-iam-policy-binding PROJECT_ID \
-     --member="serviceAccount:mood-duel-service@PROJECT_ID.iam.gserviceaccount.com" \
+   gcloud projects add-iam-policy-binding $PROJECT_ID \
+     --member="serviceAccount:mood-duel-service@$PROJECT_ID.iam.gserviceaccount.com" \
      --role="roles/logging.logWriter"
    ```
 
-4. **Create a CI/CD Service Account** with deployment permissions:
+5. **Create the CI/CD Deployer account**:
    ```bash
    gcloud iam service-accounts create mood-duel-deployer --display-name="Mood Duel Deployer"
    
    # Grant permissions for Cloud Run deployments
-   gcloud projects add-iam-policy-binding PROJECT_ID \
-     --member="serviceAccount:mood-duel-deployer@PROJECT_ID.iam.gserviceaccount.com" \
+   gcloud projects add-iam-policy-binding $PROJECT_ID \
+     --member="serviceAccount:mood-duel-deployer@$PROJECT_ID.iam.gserviceaccount.com" \
      --role="roles/run.admin"
    
-   gcloud projects add-iam-policy-binding PROJECT_ID \
-     --member="serviceAccount:mood-duel-deployer@PROJECT_ID.iam.gserviceaccount.com" \
+   gcloud projects add-iam-policy-binding $PROJECT_ID \
+     --member="serviceAccount:mood-duel-deployer@$PROJECT_ID.iam.gserviceaccount.com" \
      --role="roles/artifactregistry.admin"
-   
-   gcloud projects add-iam-policy-binding PROJECT_ID \
-     --member="serviceAccount:mood-duel-deployer@PROJECT_ID.iam.gserviceaccount.com" \
+
+   # Allow the deployer to "act as" the runtime service account
+   gcloud iam service-accounts add-iam-policy-binding \
+     mood-duel-service@$PROJECT_ID.iam.gserviceaccount.com \
+     --member="serviceAccount:mood-duel-deployer@$PROJECT_ID.iam.gserviceaccount.com" \
      --role="roles/iam.serviceAccountUser"
    ```
 
-5. **Download the CI/CD SA key** as JSON:
+6. **Download the CI/CD SA key** as JSON:
    ```bash
    gcloud iam service-accounts keys create ci-key.json \
-     --iam-account=mood-duel-deployer@PROJECT_ID.iam.gserviceaccount.com
+     --iam-account=mood-duel-deployer@$PROJECT_ID.iam.gserviceaccount.com
    ```
 
-6. **Add GitHub Secrets** in your repo → Settings → Secrets:
+7. **Add GitHub Secrets** in your repo → Settings → Secrets:
    | Secret | Value |
    |---|---|
    | `GCP_PROJECT_ID` | Your GCP project ID |
    | `GCP_SA_KEY` | The full JSON content of ci-key.json |
 
-7. **Push to `main`** — GitHub Actions will build and deploy automatically!
+8. **Push to `main`** — GitHub Actions will build and deploy automatically!
    - Cloud Run instances use the least-privilege `mood-duel-service` account
 
 ### Manual deploy (without CI/CD)
 
 ```bash
 # Set your project
-gcloud config set project YOUR_PROJECT_ID
+gcloud config set project $PROJECT_ID
 
 # Build and push image
-docker build -t gcr.io/YOUR_PROJECT_ID/mood-duel .
-docker push gcr.io/YOUR_PROJECT_ID/mood-duel
+docker build -t europe-west1-docker.pkg.dev/$PROJECT_ID/mood-duel/mood-duel:manual .
+docker push europe-west1-docker.pkg.dev/$PROJECT_ID/mood-duel/mood-duel:manual
 
 # Deploy
 gcloud run deploy mood-duel \
-  --image gcr.io/YOUR_PROJECT_ID/mood-duel \
+  --image europe-west1-docker.pkg.dev/$PROJECT_ID/mood-duel/mood-duel:manual \
   --platform managed \
   --region europe-west1 \
   --allow-unauthenticated \
