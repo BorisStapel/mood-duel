@@ -56,3 +56,15 @@ jobs:
             --max-instances 1 \
             --service-account mood-duel-service@${PROJECT_ID}.iam.gserviceaccount.com \
             --set-env-vars="ALLOWED_ORIGIN=https://mood-duel-app.a.run.app"
+
+      - name: Clean up old images
+        run: |
+          gcloud artifacts docker images list \
+            europe-west1-docker.pkg.dev/$PROJECT_ID/mood-duel/mood-duel \
+            --format="get(version)" \
+            --sort-by="~createTime" \
+            --limit=999 | tail -n +3 | while read digest; do
+              gcloud artifacts docker images delete \
+                "europe-west1-docker.pkg.dev/$PROJECT_ID/mood-duel/mood-duel@${digest}" \
+                --quiet --async || true
+          done

@@ -21,7 +21,7 @@ Two players join a room, pick emoji "moves" each round, and a rule engine decide
 
 ```bash
 # Clone the repo
-git clone https://github.com/YOUR_USERNAME/mood-duel.git
+git clone https://github.com/BorisStapel/mood-duel.git
 cd mood-duel
 
 # Download dependencies
@@ -54,8 +54,8 @@ docker run -p 8080:8080 mood-duel
    This script enables necessary APIs and creates the required service accounts with least-privilege permissions.
    ```bash
    export PROJECT_ID="mood-duel-app"
-   chmod +x scripts/setup_gcp.sh
-   ./scripts/setup_gcp.sh
+   chmod +x setup_gcp.sh
+   ./setup_gcp.sh
    ```
 
 3. **Download the CI/CD SA key** as JSON:

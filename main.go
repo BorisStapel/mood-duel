@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -21,7 +22,7 @@ var upgrader = websocket.Upgrader{
 		if allowed := os.Getenv("ALLOWED_ORIGIN"); allowed != "" {
 			return origin == allowed
 		}
-		return true // Allow all for local development
+		return r.Host == "localhost" || strings.HasPrefix(r.Host, "localhost:")
 	},
 }
 
@@ -293,7 +294,10 @@ func main() {
 	http.HandleFunc("/ws", handleWS)
 
 	server := &http.Server{
-		Addr: ":" + port,
+		Addr:        ":" + port,
+		ReadTimeout: 10 * time.Second,
+		WriteTimeout: 0, // 0 = no timeout; required for long-lived WebSocket connections
+		IdleTimeout: 120 * time.Second,
 	}
 
 	go func() {

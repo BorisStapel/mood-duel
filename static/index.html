@@ -356,7 +356,7 @@ function connect() {
         banner.className = iWon ? 'result-win' : 'result-lose';
       }
 
-      setStatus(`Round ${parseInt(p.round) - 1} complete — ready for the next?`);
+      setStatus(`Round ${parseInt(p.round)} complete — ready for the next?`);
       $('next-btn').classList.remove('hidden');
     }
 

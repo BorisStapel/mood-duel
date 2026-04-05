@@ -1,6 +1,9 @@
-# Credentials
-key.json
-*.json.key
+# Git
+.git/
+.gitignore
+
+# CI/CD
+.github/
 
 # Compiled binary
 mood-duel
@@ -9,3 +12,6 @@ mood-duel
 .DS_Store
 .idea/
 .vscode/
+
+# Docs
+README.md
