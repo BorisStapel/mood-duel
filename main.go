@@ -202,6 +202,7 @@ func handleWS(w http.ResponseWriter, r *http.Request) {
 	}
 
 	defer func() {
+		close(client.send)
 		conn.Close()
 		room.mu.Lock()
 		for i, p := range room.players {
@@ -233,7 +234,7 @@ func handleWS(w http.ResponseWriter, r *http.Request) {
 			emoji := m.Payload["emoji"]
 
 			// Validate emoji
-			if _, ok := emojiRules[emoji]; !ok && emoji != "🎲" && emoji != "🌈" {
+			if _, ok := emojiRules[emoji]; !ok {
 				continue
 			}
 
