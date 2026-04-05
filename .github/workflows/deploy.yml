@@ -53,5 +53,5 @@ jobs:
             --memory 256Mi \
             --min-instances 0 \
             --max-instances 1 \
-            --service-account mood-duel-service@${PROJECT_ID}.iam.gserviceaccount.com
-
+            --service-account mood-duel-service@${PROJECT_ID}.iam.gserviceaccount.com \
+            --set-env-vars="ALLOWED_ORIGIN=https://mood-duel-app.a.run.app"

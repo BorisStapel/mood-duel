@@ -1,20 +1,27 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"math/rand"
 	"net/http"
 	"os"
+	"os/signal"
 	"sync"
+	"syscall"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
-		// Restrict this to your actual production domain in a real deployment
-		return true
+		origin := r.Header.Get("Origin")
+		if allowed := os.Getenv("ALLOWED_ORIGIN"); allowed != "" {
+			return origin == allowed
+		}
+		return true // Allow all for local development
 	},
 }
 
@@ -110,7 +117,7 @@ func init() {
 }
 
 func resolveRound(a, b string) (winner string, flavor string) {
-	if _, ok := emojiRules[a]; !ok {
+	if _, ok := emojiRules[a]; !ok || emojiRules[b] == nil {
 		return "", "An unknown force interferes... 🌀"
 	}
 
@@ -284,6 +291,27 @@ func main() {
 	http.Handle("/", http.FileServer(http.Dir("./static")))
 	http.HandleFunc("/ws", handleWS)
 
-	log.Printf("🎲 Mood Duel running on http://localhost:%s", port)
-	log.Fatal(http.ListenAndServe(":"+port, nil))
+	server := &http.Server{
+		Addr: ":" + port,
+	}
+
+	go func() {
+		log.Printf("🎲 Mood Duel running on http://localhost:%s", port)
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("listen: %s\n", err)
+		}
+	}()
+
+	// Wait for interrupt signal to gracefully shutdown the server
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+	log.Println("Shutting down server...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := server.Shutdown(ctx); err != nil {
+		log.Fatal("Server forced to shutdown:", err)
+	}
+	log.Println("Server exiting")
 }
